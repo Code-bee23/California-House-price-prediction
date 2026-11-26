@@ -2,7 +2,7 @@
 
 An interactive web application and production-ready machine learning API built with **FastAPI** and **Scikit-learn** that predicts California residential housing valuations using a **Random Forest Regressor** trained on the California Housing dataset.
 
-https://california-house-price-prediction-jxcb.onrender.com
+Live Demo : https://california-house-price-prediction-jxcb.onrender.com
 
 ---
 
