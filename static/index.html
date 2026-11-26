@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>California Housing Price AI Estimator</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2220%22 font-size=%2220%22>🏠</text></svg>">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#151f32',
+              950: '#070b14',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-emerald-500 selection:text-white">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo & Branding -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-xl shadow-lg shadow-emerald-500/20">
+          🏡
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-white tracking-tight">California House Price AI</h1>
+            <span class="text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">FastAPI ML</span>
+          </div>
+          <p class="text-xs text-slate-400">Random Forest Regressor · Housing Intelligence Engine</p>
+        </div>
+      </div>
+
+      <!-- Right Header Status & Links -->
+      <div class="flex items-center gap-3">
+        <!-- Model Status Badge -->
+        <div id="modelStatusBadge" class="hidden sm:flex items-center px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-2"></span>
+          <span class="text-slate-300">Model Ready</span>
+        </div>
+
+        <!-- API Docs Button -->
+        <a href="/docs" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition">
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+          </svg>
+          Swagger API Docs
+        </a>
+      </div>
+    </div>
+
+    <!-- Sub-navigation Tabs -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800/60 flex space-x-1 sm:space-x-4">
+      <button data-tab-target="tab-estimator" class="px-4 py-2.5 text-sm font-semibold border-b-2 border-emerald-400 text-emerald-400 flex items-center gap-2 transition">
+        <span>🏡</span>
+        <span>Single Estimator</span>
+      </button>
+      <button data-tab-target="tab-batch" class="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition">
+        <span>📂</span>
+        <span>Batch CSV Predictor</span>
+      </button>
+      <button data-tab-target="tab-api" class="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition">
+        <span>📊</span>
+        <span>Model & API Guide</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WRAPPER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: SINGLE PROPERTY ESTIMATOR -->
+    <!-- ========================================== -->
+    <section id="tab-estimator" class="tab-content space-y-6">
+      
+      <!-- Preset Location Chips -->
+      <div class="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          Quick Regional Presets:
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button data-preset="bay_area" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/50 transition flex items-center gap-1.5">
+            <span>🌉</span> Silicon Valley / Bay Area
+          </button>
+          <button data-preset="beverly_hills" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/50 transition flex items-center gap-1.5">
+            <span>🌴</span> Beverly Hills / LA
+          </button>
+          <button data-preset="san_diego" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/50 transition flex items-center gap-1.5">
+            <span>🏖️</span> San Diego Coast
+          </button>
+          <button data-preset="sacramento" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/50 transition flex items-center gap-1.5">
+            <span>🏛️</span> Sacramento Suburbs
+          </button>
+          <button data-preset="fresno" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/50 transition flex items-center gap-1.5">
+            <span>🌾</span> Fresno / Central Valley
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Estimator Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- LEFT COLUMN: CONTROLS & SLIDERS (7 Cols) -->
+        <div class="lg:col-span-7 space-y-5">
+          <div class="glass-panel p-5 sm:p-6 rounded-2xl space-y-5">
+            
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                  <span>⚙️</span> House & Neighborhood Features
+                </h2>
+                <p class="text-xs text-slate-400">Adjust the parameters or drag the map pin to recalculate valuation.</p>
+              </div>
+
+              <!-- Live Auto-Predict Toggle -->
+              <label class="flex items-center cursor-pointer gap-2 select-none">
+                <input type="checkbox" id="liveAutoPredict" checked class="sr-only peer">
+                <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 relative"></div>
+                <span class="text-xs text-slate-300 font-medium">Auto-Predict</span>
+              </label>
+            </div>
+
+            <!-- Features Form -->
+            <form id="predictionForm" onsubmit="event.preventDefault();" class="space-y-4">
+              
+              <!-- Feature 1: Median Income -->
+              <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                <div class="flex justify-between items-center text-xs">
+                  <label for="medIncNum" class="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <span>💵</span> Median Income (MedInc)
+                  </label>
+                  <span id="medIncHelper" class="text-emerald-400 font-mono font-medium">≈ $83,250 / year</span>
+                </div>
+                <p class="text-[11px] text-slate-400">Median income in block group (in $10,000s USD)</p>
+                <div class="flex items-center gap-3 pt-1">
+                  <input type="range" id="medIncRange" min="0.5" max="15.0" step="0.1" value="8.3" class="flex-1">
+                  <input type="number" id="medIncNum" min="0.5" max="15.0" step="0.1" value="8.3" class="w-20 px-2.5 py-1 text-sm font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-emerald-400 focus:outline-none focus:border-emerald-500">
+                </div>
+              </div>
+
+              <!-- Feature 2: House Age -->
+              <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                <div class="flex justify-between items-center text-xs">
+                  <label for="houseAgeNum" class="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <span>⏳</span> House Age (HouseAge)
+                  </label>
+                  <span class="text-slate-400">Years</span>
+                </div>
+                <p class="text-[11px] text-slate-400">Median age of houses in the block group (1 to 52 years)</p>
+                <div class="flex items-center gap-3 pt-1">
+                  <input type="range" id="houseAgeRange" min="1" max="52" step="1" value="41" class="flex-1">
+                  <input type="number" id="houseAgeNum" min="1" max="52" step="1" value="41" class="w-20 px-2.5 py-1 text-sm font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                </div>
+              </div>
+
+              <!-- Feature 3: Average Rooms & Average Bedrooms Grid -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Average Rooms -->
+                <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <label for="aveRoomsNum" class="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span>🚪</span> Avg Rooms (AveRooms)
+                    </label>
+                  </div>
+                  <p class="text-[11px] text-slate-400">Rooms per household</p>
+                  <div class="flex items-center gap-2 pt-1">
+                    <input type="range" id="aveRoomsRange" min="1.0" max="12.0" step="0.1" value="6.98" class="flex-1">
+                    <input type="number" id="aveRoomsNum" min="1.0" max="15.0" step="0.1" value="6.98" class="w-16 px-2 py-1 text-sm font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+
+                <!-- Average Bedrooms -->
+                <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <label for="aveBedrmsNum" class="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span>🛏️</span> Avg Bedrooms (AveBedrms)
+                    </label>
+                  </div>
+                  <p class="text-[11px] text-slate-400">Bedrooms per household</p>
+                  <div class="flex items-center gap-2 pt-1">
+                    <input type="range" id="aveBedrmsRange" min="0.5" max="5.0" step="0.05" value="1.02" class="flex-1">
+                    <input type="number" id="aveBedrmsNum" min="0.5" max="6.0" step="0.05" value="1.02" class="w-16 px-2 py-1 text-sm font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feature 4: Population & Average Occupancy Grid -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Population -->
+                <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <label for="populationNum" class="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span>👥</span> Block Population
+                    </label>
+                  </div>
+                  <p class="text-[11px] text-slate-400">Total residents in the block</p>
+                  <div class="flex items-center gap-2 pt-1">
+                    <input type="range" id="populationRange" min="50" max="5000" step="10" value="322" class="flex-1">
+                    <input type="number" id="populationNum" min="10" max="10000" step="10" value="322" class="w-18 px-2 py-1 text-sm font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+
+                <!-- Average Occupants -->
+                <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <label for="aveOccupNum" class="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span>👨‍👩‍👧</span> Avg Occupancy (AveOccup)
+                    </label>
+                  </div>
+                  <p class="text-[11px] text-slate-400">Members per household</p>
+                  <div class="flex items-center gap-2 pt-1">
+                    <input type="range" id="aveOccupRange" min="1.0" max="8.0" step="0.1" value="2.55" class="flex-1">
+                    <input type="number" id="aveOccupNum" min="1.0" max="10.0" step="0.1" value="2.55" class="w-16 px-2 py-1 text-sm font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feature 5: Latitude & Longitude Coordinates -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <label for="latNum" class="font-semibold text-slate-200">📍 Latitude (32° to 42°)</label>
+                  </div>
+                  <div class="flex items-center gap-2 pt-1">
+                    <input type="range" id="latRange" min="32.5" max="42.0" step="0.01" value="37.88" class="flex-1">
+                    <input type="number" id="latNum" min="32.0" max="42.0" step="0.0001" value="37.8800" class="w-20 px-2 py-1 text-xs font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+
+                <div class="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <div class="flex justify-between items-center text-xs">
+                    <label for="lngNum" class="font-semibold text-slate-200">🌐 Longitude (-124° to -114°)</label>
+                  </div>
+                  <div class="flex items-center gap-2 pt-1">
+                    <input type="range" id="lngRange" min="-124.5" max="-114.0" step="0.01" value="-122.23" class="flex-1">
+                    <input type="number" id="lngNum" min="-125.0" max="-114.0" step="0.0001" value="-122.2300" class="w-20 px-2 py-1 text-xs font-mono text-right bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="pt-2 flex items-center gap-3">
+                <button type="button" id="predictBtn" class="flex-1 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 active:scale-[0.98]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                  </svg>
+                  Calculate Price Valuation
+                </button>
+                <button type="button" id="resetBtn" title="Reset to Defaults" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-sm font-semibold transition">
+                  ↺ Reset
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: INTERACTIVE MAP & VALUATION CARD (5 Cols) -->
+        <div class="lg:col-span-5 space-y-5">
+          
+          <!-- VALUATION DISPLAY CARD -->
+          <div class="glass-panel p-6 rounded-2xl price-card-glow relative overflow-hidden space-y-4">
+            
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Estimated Property Value</span>
+              <span id="tierBadge" class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Upper-Middle Market
+              </span>
+            </div>
+
+            <!-- Price Number -->
+            <div class="relative">
+              <div id="predictLoading" class="hidden absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-xl flex items-center justify-center z-10">
+                <div class="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+
+              <div id="priceDisplay" class="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 font-mono tracking-tight">
+                $452,600
+              </div>
+              <div id="priceShortDisplay" class="text-xs text-slate-400 font-mono mt-1">
+                $4.53 hundred thousands
+              </div>
+            </div>
+
+            <!-- Confidence Interval -->
+            <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-400 font-medium">Model 95% Confidence Band:</span>
+                <span id="confidenceDisplay" class="text-slate-200 font-mono font-semibold">$413,600 to $491,600</span>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-4/5 rounded-full mx-auto"></div>
+              </div>
+              <p class="text-[10px] text-slate-500 text-right">Based on empirical MAE ±$39,000</p>
+            </div>
+
+            <!-- Derived Financial Metrics -->
+            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-center">
+              <div class="p-2 rounded-lg bg-slate-900/50">
+                <div class="text-[10px] text-slate-400 font-medium">Est. Mortgage</div>
+                <div id="mortgageEstimate" class="text-xs sm:text-sm font-bold text-slate-200 font-mono mt-0.5">$2,350/mo</div>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-900/50">
+                <div class="text-[10px] text-slate-400 font-medium">Price / Room</div>
+                <div id="roomPriceEstimate" class="text-xs sm:text-sm font-bold text-slate-200 font-mono mt-0.5">$64,800</div>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-900/50">
+                <div class="text-[10px] text-slate-400 font-medium">Income Ratio</div>
+                <div id="incomeMultiple" class="text-xs sm:text-sm font-bold text-slate-200 font-mono mt-0.5">5.4x income</div>
+              </div>
+            </div>
+
+            <!-- Valuation Card Actions -->
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+              <button type="button" id="saveHistoryBtn" class="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+                <span>📌</span> Pin to Session History
+              </button>
+              <button type="button" onclick="window.print()" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition">
+                <span>🖨️</span> Print Valuation Summary
+              </button>
+            </div>
+
+
+          </div>
+
+          <!-- INTERACTIVE MAP CARD -->
+          <div class="glass-panel p-5 rounded-2xl space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <span>🗺️</span> Interactive California Map
+              </h3>
+              <span class="text-[11px] text-emerald-400 font-medium">Click / Drag to set location</span>
+            </div>
+            
+            <!-- Map Container -->
+            <div id="californiaMap" class="w-full h-72 sm:h-80 rounded-xl overflow-hidden border border-slate-800 shadow-inner"></div>
+
+            <p class="text-[11px] text-slate-400">
+              💡 <span class="text-slate-300">Tip:</span> Moving the pin across coastal, bay, or metropolitan regions triggers live recalculation because geographic location strongly dictates California land values.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Pinned Session History / Comparison Panel -->
+      <div id="sessionHistoryCard" class="glass-panel p-5 rounded-2xl space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📌</span>
+            <h3 class="text-sm font-bold text-white">Pinned Property Valuations</h3>
+            <span id="historyCountBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">0 saved</span>
+          </div>
+          <button type="button" id="clearHistoryBtn" class="text-xs text-slate-500 hover:text-slate-300 transition">
+            Clear All
+          </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+          <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400">
+              <tr>
+                <th class="px-3 py-2.5">Time</th>
+                <th class="px-3 py-2.5">Price</th>
+                <th class="px-3 py-2.5">Income (MedInc)</th>
+                <th class="px-3 py-2.5">Age</th>
+                <th class="px-3 py-2.5">Rooms</th>
+                <th class="px-3 py-2.5">Location</th>
+                <th class="px-3 py-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sessionHistoryBody" class="divide-y divide-slate-800/60 bg-slate-950/40 text-slate-300">
+              <tr>
+                <td colspan="7" class="px-4 py-4 text-center text-slate-500 text-xs italic">
+                  No pinned valuations yet. Click "Pin to Session History" on any estimate to compare properties.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: BATCH CSV PREDICTION -->
+    <!-- ========================================== -->
+    <section id="tab-batch" class="tab-content hidden space-y-6">
+      
+      <div class="glass-panel p-6 sm:p-8 rounded-2xl space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>📂</span> Batch Housing CSV Valuation
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Upload any CSV with housing features (<code class="text-emerald-400">MedInc, HouseAge, AveRooms, AveBedrms, Population, AveOccup, Latitude, Longitude</code>) to compute predictions in bulk.
+          </p>
+        </div>
+
+        <!-- Drop Zone -->
+        <div id="csvDropZone" class="border-2 border-dashed border-slate-700 hover:border-emerald-500/70 rounded-2xl p-8 sm:p-12 text-center transition-all bg-slate-900/40 cursor-pointer flex flex-col items-center justify-center space-y-4">
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+          
+          <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-3xl">
+            📄
+          </div>
+
+          <div class="space-y-1">
+            <p class="text-sm font-semibold text-slate-200">
+              Drag & drop your CSV file here, or <label for="csvFileInput" class="text-emerald-400 hover:underline cursor-pointer">browse from computer</label>
+            </p>
+            <p class="text-xs text-slate-500">Supports standard CSV files up to 50MB</p>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button type="button" id="loadSampleCsvBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-emerald-300 border border-slate-700 transition flex items-center gap-1.5">
+              <span>⚡</span> Load Pre-built Test CSV
+            </button>
+            <button type="button" id="downloadSampleBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+              <span>⬇️</span> Download Sample CSV Template
+            </button>
+          </div>
+        </div>
+
+        <!-- Selected File Status & Process Button -->
+        <div id="fileSelectedCard" class="hidden glass-panel-subtle p-4 rounded-xl flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">📑</span>
+            <div>
+              <div id="selectedFileName" class="text-sm font-bold text-white">test_houses.csv</div>
+              <div id="selectedFileSize" class="text-xs text-slate-400">12.4 KB</div>
+            </div>
+          </div>
+          <button type="button" id="processCsvBtn" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center gap-2">
+            <span>🚀 Run Batch Prediction</span>
+          </button>
+        </div>
+
+        <!-- Batch Loading Indicator -->
+        <div id="batchLoading" class="hidden py-8 text-center space-y-3">
+          <div class="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p class="text-xs text-slate-400">Processing records through Random Forest Regressor...</p>
+        </div>
+
+        <!-- Batch Results Container -->
+        <div id="batchResultsContainer" class="hidden space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 pt-5">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span>📋</span> Batch Prediction Results
+              </h3>
+              <span id="batchTotalRows" class="text-xs text-slate-400">5 records processed</span>
+            </div>
+            
+            <button type="button" id="downloadResultCsvBtn" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5">
+              <span>⬇️</span> Download predictions.csv
+            </button>
+          </div>
+
+          <!-- Preview Table -->
+          <div class="overflow-x-auto rounded-xl border border-slate-800">
+            <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
+              <thead id="batchTableHead" class="bg-slate-900"></thead>
+              <tbody id="batchTableBody" class="divide-y divide-slate-800 bg-slate-950/40"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: MODEL & API GUIDE -->
+    <!-- ========================================== -->
+    <section id="tab-api" class="tab-content hidden space-y-6">
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Model Architecture Card -->
+        <div class="glass-panel p-6 rounded-2xl space-y-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>🧠</span> Model Specifications
+          </h2>
+          
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between py-2 border-b border-slate-800">
+              <span class="text-slate-400">Algorithm</span>
+              <span class="font-mono text-emerald-400 font-semibold">RandomForestRegressor</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800">
+              <span class="text-slate-400">Trees (n_estimators)</span>
+              <span class="font-mono text-slate-200">100 trees</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800">
+              <span class="text-slate-400">Dataset Source</span>
+              <span class="text-slate-200">1990 California Housing Census</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800">
+              <span class="text-slate-400">Training Samples</span>
+              <span class="font-mono text-slate-200">16,512 block groups</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800">
+              <span class="text-slate-400">Average Absolute Error (MAE)</span>
+              <span class="font-mono text-emerald-400 font-semibold">~$32,773</span>
+            </div>
+            <div class="flex justify-between py-2">
+              <span class="text-slate-400">Serving Framework</span>
+              <span class="font-mono text-slate-200">FastAPI + Uvicorn</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Endpoints Directory -->
+        <div class="glass-panel p-6 rounded-2xl space-y-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>🔌</span> REST Endpoints
+          </h2>
+
+          <div class="space-y-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/20 text-emerald-400 text-[10px]">POST</span>
+                <span class="font-mono text-slate-200 font-semibold">/predict</span>
+              </div>
+              <p class="text-slate-400 text-[11px]">Takes single house JSON payload, returns price estimation & confidence interval.</p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/20 text-emerald-400 text-[10px]">POST</span>
+                <span class="font-mono text-slate-200 font-semibold">/predict-file</span>
+              </div>
+              <p class="text-slate-400 text-[11px]">Accepts multipart CSV upload, returns streaming CSV with predicted prices.</p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded font-mono font-bold bg-blue-500/20 text-blue-400 text-[10px]">GET</span>
+                <span class="font-mono text-slate-200 font-semibold">/health</span>
+              </div>
+              <p class="text-slate-400 text-[11px]">Returns health status, active model name, features list, and error metrics.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Live Code Snippet Generator -->
+      <div class="glass-panel p-6 rounded-2xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span>💻</span> Live API Integration Snippets
+            </h2>
+            <p class="text-xs text-slate-400">Values dynamically match the current sliders from the Estimator tab.</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="copyToClipboard('curlCode')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 transition">
+              Copy cURL
+            </button>
+            <button onclick="copyToClipboard('pythonCode')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 transition">
+              Copy Python
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- cURL -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-semibold text-slate-400">cURL Command</span>
+            <pre class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 overflow-x-auto text-xs text-emerald-400 font-mono"><code id="curlCode"></code></pre>
+          </div>
+
+          <!-- Python -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-semibold text-slate-400">Python (requests)</span>
+            <pre class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 overflow-x-auto text-xs text-cyan-300 font-mono"><code id="pythonCode"></code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pinned Session History / Comparison Panel -->
+      <div id="sessionHistoryCard" class="glass-panel p-5 rounded-2xl space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-base">📌</span>
+            <h3 class="text-sm font-bold text-white">Pinned Property Valuations</h3>
+            <span id="historyCountBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">0 saved</span>
+          </div>
+          <button type="button" id="clearHistoryBtn" class="text-xs text-slate-500 hover:text-slate-300 transition">
+            Clear All
+          </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+          <table class="min-w-full divide-y divide-slate-800 text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400">
+              <tr>
+                <th class="px-3 py-2.5">Time</th>
+                <th class="px-3 py-2.5">Price</th>
+                <th class="px-3 py-2.5">Income (MedInc)</th>
+                <th class="px-3 py-2.5">Age</th>
+                <th class="px-3 py-2.5">Rooms</th>
+                <th class="px-3 py-2.5">Location</th>
+                <th class="px-3 py-2.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sessionHistoryBody" class="divide-y divide-slate-800/60 bg-slate-950/40 text-slate-300">
+              <tr>
+                <td colspan="7" class="px-4 py-4 text-center text-slate-500 text-xs italic">
+                  No pinned valuations yet. Click "Pin to Session History" on any estimate to compare properties.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-2">
+      <div>California Housing Price Prediction System · Built with FastAPI & Scikit-learn</div>
+      <div class="flex items-center gap-4">
+        <a href="/docs" class="hover:text-emerald-400 transition">API Documentation</a>
+        <a href="/health" class="hover:text-emerald-400 transition">Health Check</a>
+        <a href="/sample-csv" class="hover:text-emerald-400 transition">Sample CSV</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- App JS -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
