@@ -67,6 +67,8 @@ let mapMarker = null;
 let isLivePredict = true;
 let predictDebounceTimer = null;
 let lastBatchFile = null;
+let lastPredictionData = null;
+let sessionHistory = [];
 
 // DOM Ready
 document.addEventListener("DOMContentLoaded", () => {
@@ -75,6 +77,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initMap();
   initPresets();
   initBatchUpload();
+  initSessionHistory();
+  loadFeatureImportances();
   checkApiHealth();
   updateCodeSnippets();
 
@@ -354,6 +358,7 @@ async function fetchPrediction() {
     }
 
     const data = await response.json();
+    lastPredictionData = { payload, data, timestamp: new Date() };
 
     // Render Price
     if (priceDisplay) priceDisplay.innerText = data.predicted_price;
@@ -699,4 +704,145 @@ function showToast(message, type = "success") {
     setTimeout(() => toast.remove(), 300);
   }, 3200);
 }
+
+// Session Valuation History
+function initSessionHistory() {
+  const saveBtn = document.getElementById("saveHistoryBtn");
+  const clearBtn = document.getElementById("clearHistoryBtn");
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      if (!lastPredictionData) {
+        showToast("Please calculate a prediction first.", "warning");
+        return;
+      }
+      pinCurrentValuation(lastPredictionData);
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      sessionHistory = [];
+      renderSessionHistory();
+      showToast("Session history cleared.");
+    });
+  }
+}
+
+function pinCurrentValuation(item) {
+  sessionHistory.unshift(item);
+  if (sessionHistory.length > 10) sessionHistory.pop();
+  renderSessionHistory();
+  showToast(`Pinned ${item.data.predicted_price} to session history!`);
+}
+
+function renderSessionHistory() {
+  const tbody = document.getElementById("sessionHistoryBody");
+  const countBadge = document.getElementById("historyCountBadge");
+  if (!tbody) return;
+
+  if (countBadge) countBadge.innerText = `${sessionHistory.length} saved`;
+
+  if (sessionHistory.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="px-4 py-4 text-center text-slate-500 text-xs italic">
+          No pinned valuations yet. Click "Pin to Session History" on any estimate to compare properties.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = sessionHistory.map((item, idx) => {
+    const time = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const p = item.payload;
+    return `
+      <tr class="hover:bg-slate-800/40 transition-colors">
+        <td class="px-3 py-2.5 font-mono text-[11px] text-slate-400">${time}</td>
+        <td class="px-3 py-2.5 font-mono font-bold text-emerald-400">${item.data.predicted_price}</td>
+        <td class="px-3 py-2.5 text-slate-300">$${(p.MedInc * 10000).toLocaleString()}</td>
+        <td class="px-3 py-2.5 text-slate-300">${p.HouseAge} yrs</td>
+        <td class="px-3 py-2.5 text-slate-300">${p.AveRooms} rms</td>
+        <td class="px-3 py-2.5 text-slate-400 font-mono text-[11px]">${p.Latitude.toFixed(2)}°, ${p.Longitude.toFixed(2)}°</td>
+        <td class="px-3 py-2.5 text-right">
+          <button onclick="restoreSessionItem(${idx})" class="px-2 py-1 text-[11px] font-medium text-emerald-400 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/30 rounded border border-emerald-500/20 transition">
+            Restore
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+window.restoreSessionItem = function(idx) {
+  const item = sessionHistory[idx];
+  if (!item) return;
+
+  const setVal = (id, val) => {
+    const num = document.getElementById(`${id}Num`);
+    const range = document.getElementById(`${id}Range`);
+    if (num) num.value = val;
+    if (range) range.value = val;
+  };
+
+  const p = item.payload;
+  setVal("medInc", p.MedInc);
+  setVal("houseAge", p.HouseAge);
+  setVal("aveRooms", p.AveRooms);
+  setVal("aveBedrms", p.AveBedrms);
+  setVal("population", p.Population);
+  setVal("aveOccup", p.AveOccup);
+  setVal("lat", p.Latitude);
+  setVal("lng", p.Longitude);
+
+  if (map && mapMarker) {
+    mapMarker.setLatLng([p.Latitude, p.Longitude]);
+    map.panTo([p.Latitude, p.Longitude]);
+  }
+
+  updateCodeSnippets();
+  fetchPrediction();
+  showToast(`Restored property valuation (${item.data.predicted_price})`);
+};
+
+// Feature Importances Loader
+async function loadFeatureImportances() {
+  const listEl = document.getElementById("featureImportanceList");
+  if (!listEl) return;
+
+  try {
+    const res = await fetch("/model-insights");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.feature_importances) return;
+
+    const friendlyNames = {
+      MedInc: "Median Income (MedInc)",
+      AveOccup: "Average Household Occupancy (AveOccup)",
+      Latitude: "Geographic Latitude (North/South)",
+      Longitude: "Geographic Longitude (East/West)",
+      HouseAge: "Median House Age",
+      AveRooms: "Average Number of Rooms",
+      Population: "Block Group Population",
+      AveBedrms: "Average Number of Bedrooms"
+    };
+
+    listEl.innerHTML = data.feature_importances.map(item => `
+      <div class="space-y-1">
+        <div class="flex justify-between text-xs">
+          <span class="font-medium text-slate-300">${friendlyNames[item.feature] || item.feature}</span>
+          <span class="font-mono text-emerald-400 font-semibold">${item.importance.toFixed(1)}%</span>
+        </div>
+        <div class="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+          <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: ${item.importance}%"></div>
+        </div>
+      </div>
+    `).join("");
+
+  } catch (err) {
+    console.warn("Could not load dynamic feature importances:", err);
+  }
+}
+
 
